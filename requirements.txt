@@ -1,6 +1,9 @@
 # Core
 python-dotenv
 
+# Mongodb
+pymongo
+
 # LangChain core
 langchain
 langchain-core

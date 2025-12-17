@@ -1,0 +1,31 @@
+# Core
+python-dotenv
+
+# LangChain core
+langchain
+langchain-core
+langchain-community
+
+# Google Gemini
+langchain-google-genai
+google-generativeai
+
+# Vector stores
+# chromadb
+
+# Embeddings / Models
+sentence-transformers
+huggingface-hub
+
+# Cohere
+cohere
+
+# Document loaders
+pypdf
+docx2txt
+
+# Utilities
+tiktoken
+
+# Streamlit
+streamlit

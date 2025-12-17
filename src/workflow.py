@@ -194,6 +194,7 @@ def answer_compiler(state:AgentState):
         system_prompt = SystemMessage(
             content=prompts.answer_compiler_prompt
         )
+        
         messages_to_send = [system_prompt] + state["query"] + state["tool_responses"]
         print(f"\n{messages_to_send}")
         response = base_llm.invoke(messages_to_send)
@@ -312,7 +313,7 @@ workflow.add_edge("tools", "agent")
 workflow.add_conditional_edges(
     "agent",
     should_continue,
-    {"continue":"tools", "end": "answer_compiler"}
+    {"continue":"tools", "end": "judge"}
 )
 workflow.add_edge("answer_compiler", "judge")
 workflow.add_conditional_edges(

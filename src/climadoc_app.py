@@ -5,7 +5,8 @@ from pathlib import Path
 from langchain_core.messages import HumanMessage, AIMessage
 from langchain_google_genai import ChatGoogleGenerativeAI
 from workflow import run_climadoc_workflow
-from rag_pipelines import document_ingestion_pipeline
+from rag_pipelines import document_ingestion_pipeline, configure_genai_api_key as configure_rag_genai
+from qdrant_connector import configure_genai_api_key as configure_qdrant_genai
 from secrets_loader import get_secret
 
 # Page configuration
@@ -27,8 +28,8 @@ if "llm_model" not in st.session_state:
     st.session_state.llm_model = "gemini-2.0-flash"
 
 if "api_key" not in st.session_state:
-    # Try to get API key from Streamlit secrets/TOML/environment as default
-    st.session_state.api_key = get_secret("GOOGLE_API_KEY", "")
+    # API key must be provided by user in the sidebar
+    st.session_state.api_key = ""
 
 if "llm_initialized" not in st.session_state:
     st.session_state.llm_initialized = False
@@ -36,20 +37,41 @@ if "llm_initialized" not in st.session_state:
 
 def initialize_llm():
     """Initialize the LLM with the API key and model from session state."""
-    if st.session_state.api_key and st.session_state.llm_model:
-        try:
-            llm = ChatGoogleGenerativeAI(
-                model=st.session_state.llm_model,
-                google_api_key=st.session_state.api_key,
-                temperature=0.7
-            )
-            st.session_state.llm_initialized = True
-            return llm
-        except Exception as e:
-            st.error(f"Error initializing LLM: {str(e)}")
-            st.session_state.llm_initialized = False
-            return None
-    return None
+    # Validate API key is provided
+    if not st.session_state.api_key or not st.session_state.api_key.strip():
+        return None
+    
+    if not st.session_state.llm_model:
+        return None
+    
+    try:
+        api_key = st.session_state.api_key.strip()
+        
+        # Validate API key format (basic check - should start with AIza)
+        if not api_key.startswith("AIza"):
+            st.warning("⚠️ API key format looks incorrect. Google API keys typically start with 'AIza'")
+        
+        # Configure genai for RAG and Qdrant operations
+        configure_rag_genai(api_key)
+        configure_qdrant_genai(api_key)
+        
+        # Create LLM instance with the API key
+        llm = ChatGoogleGenerativeAI(
+            model=st.session_state.llm_model,
+            google_api_key=api_key,
+            temperature=0.7
+        )
+        
+        st.session_state.llm_initialized = True
+        return llm
+    except Exception as e:
+        error_msg = str(e)
+        if "API key" in error_msg or "INVALID_ARGUMENT" in error_msg:
+            st.error(f"❌ Invalid API Key: Please check your Google API key. Error: {error_msg}")
+        else:
+            st.error(f"Error initializing LLM: {error_msg}")
+        st.session_state.llm_initialized = False
+        return None
 
 
 def clear_chat_history():
@@ -97,6 +119,10 @@ def sidebar_configuration():
         if api_key != st.session_state.api_key:
             st.session_state.api_key = api_key
             st.session_state.llm_initialized = False
+            # Reconfigure genai if API key is provided
+            if api_key:
+                configure_rag_genai(api_key)
+                configure_qdrant_genai(api_key)
         
         # Initialize LLM button
         if st.button("Initialize LLM", type="primary", use_container_width=True):
@@ -137,9 +163,25 @@ def sidebar_configuration():
                             with open(file_path, "wb") as f:
                                 f.write(uploaded_file.getbuffer())
                             
-                            # Process document
-                            document_ingestion_pipeline(base_dir=str(temp_path))
-                            st.success(f"✅ Document '{uploaded_file.name}' processed and added to vector database!")
+                            # Process document (pass API key if available)
+                            api_key = st.session_state.api_key if st.session_state.api_key else None
+                            if not api_key:
+                                st.error("⚠️ Please provide a Google API key in the sidebar before processing documents.")
+                            else:
+                                result = document_ingestion_pipeline(base_dir=str(temp_path), api_key=api_key)
+                                
+                                # Display results based on status
+                                if result["status"] == "success":
+                                    st.success(
+                                        f"✅ Successfully processed '{uploaded_file.name}'\n\n"
+                                        f"📄 Documents loaded: {result['documents_loaded']}\n"
+                                        f"✂️ Chunks created: {result['chunks_created']}\n"
+                                        f"🔢 Embeddings stored: {result['embeddings_stored']}"
+                                    )
+                                elif result["status"] == "warning":
+                                    st.warning(f"⚠️ {result['message']}")
+                                else:
+                                    st.error(f"❌ {result['message']}")
                     except Exception as e:
                         st.error(f"Error processing document: {str(e)}")
         
@@ -195,7 +237,10 @@ def main():
         # Get LLM instance (always try to initialize to handle API key changes)
         llm = initialize_llm()
         if not llm:
-            error_msg = "⚠️ Please configure and initialize the LLM in the sidebar before asking questions."
+            if not st.session_state.api_key or not st.session_state.api_key.strip():
+                error_msg = "⚠️ Please enter your Google API key in the sidebar and click 'Initialize LLM' before asking questions."
+            else:
+                error_msg = "⚠️ Failed to initialize LLM. Please check your API key and try again."
             st.error(error_msg)
             st.session_state.messages.append({"role": "assistant", "content": error_msg})
             st.stop()
@@ -204,7 +249,7 @@ def main():
         with st.chat_message("assistant"):
             with st.spinner("Thinking..."):
                 try:
-                    # Run the workflow
+                    # Run the workflow with the initialized LLM
                     result = run_climadoc_workflow(
                         query=prompt,
                         conversation_history=st.session_state.conversation_history[:-1],  # Exclude current message

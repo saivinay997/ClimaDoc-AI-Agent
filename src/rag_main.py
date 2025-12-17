@@ -3,7 +3,7 @@ from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_core.messages import AIMessage, SystemMessage, HumanMessage
 
 import rag_prompts
-from rag_pipelines import document_retrival_pipeline
+from rag_pipelines import document_retrieval_pipeline
 
 
 model = ChatGoogleGenerativeAI(model="gemini-2.0-flash")
@@ -17,7 +17,7 @@ def rag_answer_generator(query: str, top_k: int = 5) -> dict:
     
 
     # Step 1: Retrieve documents
-    context, sources, documents = document_retrival_pipeline(query.content, top_k)
+    context, sources, documents = document_retrieval_pipeline(query.content, top_k)
     print(f"Retireved the context.")
     if not context:
         answer = model.invoke([query])

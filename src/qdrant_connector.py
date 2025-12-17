@@ -23,10 +23,17 @@ qdrant_client = QdrantClient(
 )
 COLLECTION_NAME = "rag_documents"
 
-GOOGLE_API_KEY = get_secret("GOOGLE_API_KEY")
-genai.configure(api_key=GOOGLE_API_KEY)
-
 EMBEDDING_MODEL = "models/text-embedding-004"
+
+# Global variable to store the API key (configured by Streamlit app)
+_google_api_key = None
+
+def configure_genai_api_key(api_key: str):
+    """Configure the Google Generative AI API key globally."""
+    global _google_api_key
+    _google_api_key = api_key
+    if api_key:
+        genai.configure(api_key=api_key)
 
 def create_collection(vector_size: int):
     qdrant_client.recreate_collection(
@@ -85,7 +92,23 @@ def store_embeddings_qdrant(
         )
 
 
-def embed_query(query: str) -> list[float]:
+def embed_query(query: str, api_key: str = None) -> list[float]:
+    """
+    Generate embedding for a query string.
+    
+    Args:
+        query (str): The query string to embed
+        api_key (str, optional): Google API key. If not provided, uses globally configured key.
+    
+    Returns:
+        list[float]: The embedding vector
+    """
+    # Configure API key if provided
+    if api_key:
+        genai.configure(api_key=api_key)
+    elif not _google_api_key:
+        raise ValueError("Google API key must be configured. Call configure_genai_api_key() or pass api_key parameter.")
+    
     response = genai.embed_content(
         model=EMBEDDING_MODEL,
         content=query,
@@ -97,9 +120,20 @@ def retrieve_similar_documents(
     query: str,
     top_k: int = 5,
     metadata_filter: Optional[dict] = None,
+    api_key: str = None,
 ) -> List[Document]:
     """
     Retrieve similar documents from Qdrant using Gemini embeddings.
+    
+    Args:
+        query (str): The search query
+        top_k (int): Number of documents to retrieve
+        metadata_filter (Optional[dict]): Optional metadata filter
+        api_key (str, optional): Google API key for embeddings. If not provided, 
+                                uses globally configured key.
+
+    Returns:
+        List[Document]: List of similar documents
     """
 
     qdrant_filter = None
@@ -113,7 +147,7 @@ def retrieve_similar_documents(
                 for key, value in metadata_filter.items()
             ]
         )
-    query_embedding = embed_query(query)
+    query_embedding = embed_query(query, api_key=api_key)
     results = qdrant_client.query_points(
         collection_name=COLLECTION_NAME,
         query=query_embedding,

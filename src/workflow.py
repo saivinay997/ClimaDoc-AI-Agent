@@ -11,13 +11,10 @@ from langchain_google_genai import ChatGoogleGenerativeAI
 
 import prompts
 from agent_tools import tools, format_tool_description
-from secrets_loader import get_secret
-
-GOOGLE_API_KEY = get_secret("GOOGLE_API_KEY")
-base_llm = ChatGoogleGenerativeAI(model="gemini-2.0-flash", google_api_key=GOOGLE_API_KEY)
 
 # Global variable to store the current LLM instance (for session-based configuration)
-_current_llm = base_llm
+# The LLM is configured and passed from the Streamlit app
+_current_llm = None
 
 def set_llm(llm_instance):
     """Set the LLM instance to be used by the workflow nodes."""
@@ -26,6 +23,8 @@ def set_llm(llm_instance):
 
 def get_llm():
     """Get the current LLM instance."""
+    if _current_llm is None:
+        raise ValueError("LLM not initialized. Please initialize the LLM in the Streamlit app before using the workflow.")
     return _current_llm
 
 
@@ -61,6 +60,11 @@ def decision_making_node(state: AgentState):
     
     try:
         llm = get_llm()
+        if llm is None:
+            return {
+                "action": "direct",
+                "messages": [AIMessage(content="I apologize, but the LLM is not properly initialized. Please check your API key configuration.")]
+            }
         decision_making_llm = llm.with_structured_output(DecisionMakingOutput)
         system_prompt = SystemMessage(content=prompts.decision_making_prompt)
         response: DecisionMakingOutput = decision_making_llm.invoke(
@@ -351,9 +355,13 @@ def run_climadoc_workflow(query: str, conversation_history: Optional[list] = Non
         llm_instance: Optional LLM instance to use (if None, uses the default)
     """
     try:
-        # Set LLM if provided
-        if llm_instance is not None:
-            set_llm(llm_instance)
+        # Set LLM if provided - this is required
+        if llm_instance is None:
+            return {
+                "messages": [AIMessage(content="I apologize, but the LLM is not initialized. Please configure your API key in the sidebar and click 'Initialize LLM'.")]
+            }
+        
+        set_llm(llm_instance)
         
         # Validate input query
         if not query or not query.strip():

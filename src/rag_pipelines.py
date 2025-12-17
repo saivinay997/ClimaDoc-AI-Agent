@@ -1,6 +1,6 @@
 import os
 from pathlib import Path
-from typing import List
+from typing import List, Tuple
 from uuid import uuid4
 import time
 
@@ -17,12 +17,18 @@ from langchain_community.document_loaders import (
 from langchain_core.documents import Document
 
 from qdrant_connector import create_collection, store_embeddings_qdrant, retrieve_similar_documents
-from secrets_loader import get_secret
-
-GOOGLE_API_KEY = get_secret("GOOGLE_API_KEY")
-genai.configure(api_key=GOOGLE_API_KEY)
 
 EMBEDDING_MODEL = "models/text-embedding-004"
+
+# Global variable to store the API key (configured by Streamlit app)
+_google_api_key = None
+
+def configure_genai_api_key(api_key: str):
+    """Configure the Google Generative AI API key globally."""
+    global _google_api_key
+    _google_api_key = api_key
+    if api_key:
+        genai.configure(api_key=api_key)
 
 
 def langchain_document_loader(
@@ -145,9 +151,16 @@ def generate_gemini_embeddings(
     documents: List[Document],
     batch_size: int = 16,
     sleep_seconds: float = 0.1,
+    api_key: str = None,
 ) -> List[dict]:
     """
     Generate Gemini embeddings for LangChain Documents.
+
+    Args:
+        documents (List[Document]): Documents to generate embeddings for
+        batch_size (int): Number of documents to process in each batch
+        sleep_seconds (float): Sleep time between API calls
+        api_key (str, optional): Google API key. If not provided, uses globally configured key.
 
     Returns a list of dicts:
     {
@@ -156,6 +169,11 @@ def generate_gemini_embeddings(
         "metadata": dict
     }
     """
+    # Configure API key if provided
+    if api_key:
+        genai.configure(api_key=api_key)
+    elif not _google_api_key:
+        raise ValueError("Google API key must be configured. Call configure_genai_api_key() or pass api_key parameter.")
 
     embedded_chunks = []
 
@@ -189,32 +207,214 @@ def generate_gemini_embeddings(
     return embedded_chunks
 
 
-def document_ingestion_pipeline(base_dir: str):
+def document_ingestion_pipeline(base_dir: str, api_key: str = None) -> dict:
+    """
+    Complete document ingestion pipeline that loads, chunks, embeds, and stores documents.
     
-    documents = langchain_document_loader(base_dir=base_dir)
-    documents_chunked = chunk_langchain_documents(documents)
-    print("created chunks")
-    embeddings = generate_gemini_embeddings(documents_chunked)
-    print("generated embeddings")
-    create_collection(vector_size=768)
-    print("storing")
-    store_embeddings_qdrant(embedded_chunks=embeddings)
-    print(f"Injested {len(embeddings)} embeddings in Qdrant DB")
+    This function orchestrates the entire document ingestion process:
+    1. Loads documents from the specified directory (supports PDF, TXT, CSV, DOCX)
+    2. Chunks documents into smaller, manageable pieces
+    3. Generates embeddings using Google Gemini embedding model
+    4. Creates/updates the Qdrant collection
+    5. Stores embeddings in the vector database
+    
+    Args:
+        base_dir (str): Path to the directory containing documents to ingest.
+                        Can be a string path or Path object.
+        api_key (str, optional): Google API key for embeddings. If not provided, 
+                                uses globally configured key via configure_genai_api_key().
+    
+    Returns:
+        dict: Summary dictionary containing:
+            - "status" (str): "success" or "error"
+            - "documents_loaded" (int): Number of documents loaded
+            - "chunks_created" (int): Number of chunks created
+            - "embeddings_generated" (int): Number of embeddings generated
+            - "embeddings_stored" (int): Number of embeddings stored in Qdrant
+            - "message" (str): Status message or error description
+    
+    Raises:
+        ValueError: If base_dir is empty or invalid, or if API key is not configured
+        FileNotFoundError: If the directory doesn't exist
+        Exception: For errors during embedding generation or storage
+    
+    Example:
+        >>> result = document_ingestion_pipeline("./documents", api_key="your-api-key")
+        >>> print(result["embeddings_stored"])
+        150
+    """
+    try:
+        # Validate input
+        if not base_dir or not str(base_dir).strip():
+            raise ValueError("base_dir cannot be empty")
+        
+        base_path = Path(base_dir)
+        if not base_path.exists():
+            raise FileNotFoundError(f"Directory not found: {base_dir}")
+        
+        # Step 1: Load documents
+        documents = langchain_document_loader(base_dir=base_path)
+        if not documents:
+            return {
+                "status": "warning",
+                "documents_loaded": 0,
+                "chunks_created": 0,
+                "embeddings_generated": 0,
+                "embeddings_stored": 0,
+                "message": f"No documents found in {base_dir}"
+            }
+        
+        # Step 2: Chunk documents
+        documents_chunked = chunk_langchain_documents(documents)
+        print(f"✓ Created {len(documents_chunked)} chunks from {len(documents)} documents")
+        
+        # Step 3: Generate embeddings
+        embeddings = generate_gemini_embeddings(documents_chunked, api_key=api_key)
+        print(f"✓ Generated {len(embeddings)} embeddings")
+        
+        if not embeddings:
+            return {
+                "status": "error",
+                "documents_loaded": len(documents),
+                "chunks_created": len(documents_chunked),
+                "embeddings_generated": 0,
+                "embeddings_stored": 0,
+                "message": "Failed to generate embeddings"
+            }
+        
+        # Step 4: Create/update collection
+        create_collection(vector_size=768)
+        print("✓ Collection ready")
+        
+        # Step 5: Store embeddings
+        store_embeddings_qdrant(embedded_chunks=embeddings)
+        print(f"✓ Stored {len(embeddings)} embeddings in Qdrant DB")
+        
+        return {
+            "status": "success",
+            "documents_loaded": len(documents),
+            "chunks_created": len(documents_chunked),
+            "embeddings_generated": len(embeddings),
+            "embeddings_stored": len(embeddings),
+            "message": f"Successfully ingested {len(embeddings)} embeddings from {len(documents)} documents"
+        }
+        
+    except ValueError as e:
+        error_msg = f"Invalid input: {str(e)}"
+        print(f"❌ {error_msg}")
+        return {
+            "status": "error",
+            "documents_loaded": 0,
+            "chunks_created": 0,
+            "embeddings_generated": 0,
+            "embeddings_stored": 0,
+            "message": error_msg
+        }
+    except FileNotFoundError as e:
+        error_msg = f"Directory not found: {str(e)}"
+        print(f"❌ {error_msg}")
+        return {
+            "status": "error",
+            "documents_loaded": 0,
+            "chunks_created": 0,
+            "embeddings_generated": 0,
+            "embeddings_stored": 0,
+            "message": error_msg
+        }
+    except Exception as e:
+        error_msg = f"Error during ingestion: {str(e)}"
+        print(f"❌ {error_msg}")
+        return {
+            "status": "error",
+            "documents_loaded": 0,
+            "chunks_created": 0,
+            "embeddings_generated": 0,
+            "embeddings_stored": 0,
+            "message": error_msg
+        }
 
 
-def document_retrival_pipeline(query:str, top_k:int=5):
+def document_retrieval_pipeline(query: str, top_k: int = 5, api_key: str = None) -> Tuple[str, List[str], List[Document]]:
+    """
+    Retrieve relevant documents from the vector database based on a query.
     
-    documents = retrieve_similar_documents(query=query, top_k=top_k)
+    This function performs semantic search to find the most relevant document chunks
+    for a given query, formats them into a context string, and extracts unique sources.
     
-    context = ""
-    sources = []
-    for document in documents:
-        context+="\n " + f"- {document.page_content}"
-        source = document.metadata.get("source").split("\\")[-1]
-        if source not in sources:
-            sources.append(source)
+    Args:
+        query (str): The search query/question to find relevant documents for.
+        top_k (int, optional): Maximum number of similar documents to retrieve. 
+                              Defaults to 5. Must be a positive integer.
+        api_key (str, optional): Google API key for embeddings. If not provided, 
+                                uses globally configured key via configure_genai_api_key().
     
-    return context, sources, documents
+    Returns:
+        tuple[str, List[str], List[Document]]: A tuple containing:
+            - context (str): Formatted string containing all retrieved document chunks,
+                           with each chunk prefixed by "- " and separated by newlines.
+                           Empty string if no documents found.
+            - sources (List[str]): List of unique source file names (without path).
+                                 Empty list if no documents found.
+            - documents (List[Document]): List of LangChain Document objects retrieved.
+                                        Empty list if no documents found.
+    
+    Raises:
+        ValueError: If query is empty or top_k is not a positive integer.
+        Exception: For errors during document retrieval from Qdrant.
+    
+    Example:
+        >>> context, sources, docs = document_retrieval_pipeline("What is climate change?", top_k=3, api_key="your-key")
+        >>> print(f"Found {len(sources)} sources")
+        Found 2 sources
+        >>> print(len(context))
+        1250
+    """
+    try:
+        # Validate input
+        if not query or not query.strip():
+            raise ValueError("Query cannot be empty")
+        
+        if not isinstance(top_k, int) or top_k <= 0:
+            raise ValueError("top_k must be a positive integer")
+        
+        # Retrieve similar documents
+        documents = retrieve_similar_documents(query=query.strip(), top_k=top_k, api_key=api_key)
+        
+        if not documents:
+            return "", [], []
+        
+        # Build context string and extract sources
+        context_parts = []
+        sources = []
+        seen_sources = set()
+        
+        for document in documents:
+            # Add document content to context
+            if document.page_content:
+                context_parts.append(f"- {document.page_content.strip()}")
+            
+            # Extract and deduplicate source file names
+            source_path = document.metadata.get("source", "")
+            if source_path:
+                # Handle both Windows (\) and Unix (/) path separators
+                source_name = source_path.replace("\\", "/").split("/")[-1]
+                if source_name and source_name not in seen_sources:
+                    sources.append(source_name)
+                    seen_sources.add(source_name)
+        
+        # Join context parts with newlines
+        context = "\n ".join(context_parts) if context_parts else ""
+        
+        return context, sources, documents
+        
+    except ValueError as e:
+        error_msg = f"Invalid input: {str(e)}"
+        print(f"❌ {error_msg}")
+        return "", [], []
+    except Exception as e:
+        error_msg = f"Error during document retrieval: {str(e)}"
+        print(f"❌ {error_msg}")
+        return "", [], []
 
 
 

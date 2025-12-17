@@ -3,7 +3,7 @@ from pydantic import BaseModel, Field
 
 from openweatherclient import OpenWeatherClient
 from rag_main import rag_answer_generator
-from rag_pipelines import document_retrival_pipeline
+from rag_pipelines import document_retrieval_pipeline
 
 class GetWeatherInfoInput(BaseModel):
     city: str = Field(description="Location for which we need weather information.")
@@ -50,7 +50,7 @@ def get_context_for_query(query:str):
         Output:
             context: str - Context extracted by vector search in vector DB
     """
-    context, _, _ = document_retrival_pipeline(query=query, top_k=3)
+    context, _, _ = document_retrieval_pipeline(query=query, top_k=3)
     return context
 
 

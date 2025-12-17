@@ -2,7 +2,7 @@ from langchain_core.tools import BaseTool, tool
 from pydantic import BaseModel, Field
 
 from openweatherclient import OpenWeatherClient
-from rag_main import rag_answer_generator
+# from rag_main import rag_answer_generator  # Not currently used, but available if needed
 from rag_pipelines import document_retrieval_pipeline
 
 class GetWeatherInfoInput(BaseModel):

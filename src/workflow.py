@@ -18,6 +18,18 @@ from agent_tools import tools, format_tool_description
 load_dotenv()
 base_llm = ChatGoogleGenerativeAI(model="gemini-2.0-flash")
 
+# Global variable to store the current LLM instance (for session-based configuration)
+_current_llm = base_llm
+
+def set_llm(llm_instance):
+    """Set the LLM instance to be used by the workflow nodes."""
+    global _current_llm
+    _current_llm = llm_instance
+
+def get_llm():
+    """Get the current LLM instance."""
+    return _current_llm
+
 
 class AgentState(TypedDict):
     query: list = []
@@ -50,8 +62,8 @@ def decision_making_node(state: AgentState):
         }
     
     try:
-        
-        decision_making_llm = base_llm.with_structured_output(DecisionMakingOutput)
+        llm = get_llm()
+        decision_making_llm = llm.with_structured_output(DecisionMakingOutput)
         system_prompt = SystemMessage(content=prompts.decision_making_prompt)
         response: DecisionMakingOutput = decision_making_llm.invoke(
             [system_prompt] + state["messages"]
@@ -99,10 +111,11 @@ def planning_node(state: AgentState):
         }
     
     try:
+        llm = get_llm()
         system_prompt = SystemMessage(
             content=prompts.planning_prompt.format(tools=format_tool_description(tools))
         )
-        response = base_llm.invoke([system_prompt] + state["messages"])
+        response = llm.invoke([system_prompt] + state["messages"])
         print("Planning node output:", response)
         return {
             "messages": [response],
@@ -141,7 +154,8 @@ def agent_node(state: AgentState):
         return {"messages": [error_message]}
     
     try:
-        agent_llm = base_llm.bind_tools(tools)
+        llm = get_llm()
+        agent_llm = llm.bind_tools(tools)
         response = agent_llm.invoke(messages_to_send)
         print("Agent node output:", response)
         return {"messages": [response]}
@@ -191,13 +205,14 @@ def answer_compiler(state:AgentState):
         }
     
     try:
+        llm = get_llm()
         system_prompt = SystemMessage(
             content=prompts.answer_compiler_prompt
         )
         
         messages_to_send = [system_prompt] + state["query"] + state["tool_responses"]
         print(f"\n{messages_to_send}")
-        response = base_llm.invoke(messages_to_send)
+        response = llm.invoke(messages_to_send)
         print("Answer Compiler node output:", response)
         return {
             "messages": [response]
@@ -230,7 +245,8 @@ def judge_node(state: AgentState):
         }
 
     try:
-        judge_llm = base_llm.with_structured_output(JudgeOutput)
+        llm = get_llm()
+        judge_llm = llm.with_structured_output(JudgeOutput)
         system_prompt = SystemMessage(content=prompts.judge_prompt)
         response: JudgeOutput = judge_llm.invoke([system_prompt] + state["messages"])
         output = {
@@ -327,20 +343,37 @@ workflow.add_edge("termination", END)
 climadoc = workflow.compile(debug=True)
     
 # Wrapper function to handle invocation properly
-def run_climadoc_workflow(query: str):
+def run_climadoc_workflow(query: str, conversation_history: Optional[list] = None, llm_instance: Optional[ChatGoogleGenerativeAI] = None):
     """
     Wrapper function to run the research workflow with proper error handling
+    
+    Args:
+        query: The user's query
+        conversation_history: Optional list of previous messages (HumanMessage/AIMessage) to maintain context
+        llm_instance: Optional LLM instance to use (if None, uses the default)
     """
     try:
+        # Set LLM if provided
+        if llm_instance is not None:
+            set_llm(llm_instance)
+        
         # Validate input query
         if not query or not query.strip():
             return {
                 "messages": [AIMessage(content="I apologize, but I didn't receive a valid query. Please provide a question or request.")]
             }
         
+        # Build messages list with conversation history
+        current_query = HumanMessage(content=query.strip())
+        if conversation_history:
+            # Include conversation history, then add the current query
+            messages = conversation_history + [current_query]
+        else:
+            messages = [current_query]
+        
         initial_state = {
-            "query": [HumanMessage(content=query.strip())],
-            "messages": [HumanMessage(content=query.strip())]
+            "query": [current_query],
+            "messages": messages
         }
         
         

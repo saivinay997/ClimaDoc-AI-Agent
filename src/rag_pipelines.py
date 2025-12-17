@@ -193,8 +193,11 @@ def document_ingestion_pipeline(base_dir: str):
     
     documents = langchain_document_loader(base_dir=base_dir)
     documents_chunked = chunk_langchain_documents(documents)
+    print("created chunks")
     embeddings = generate_gemini_embeddings(documents_chunked)
+    print("generated embeddings")
     create_collection(vector_size=768)
+    print("storing")
     store_embeddings_qdrant(embedded_chunks=embeddings)
     print(f"Injested {len(embeddings)} embeddings in Qdrant DB")
 

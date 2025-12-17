@@ -1,10 +1,8 @@
 import os
 from pathlib import Path
 from typing import List
-from dotenv import load_dotenv
 from uuid import uuid4
 import time
-load_dotenv()
 
 from pypdf import PdfReader
 from langchain_text_splitters import RecursiveCharacterTextSplitter
@@ -19,8 +17,10 @@ from langchain_community.document_loaders import (
 from langchain_core.documents import Document
 
 from qdrant_connector import create_collection, store_embeddings_qdrant, retrieve_similar_documents
+from secrets_loader import get_secret
 
-genai.configure(api_key=os.environ["GOOGLE_API_KEY"])
+GOOGLE_API_KEY = get_secret("GOOGLE_API_KEY")
+genai.configure(api_key=GOOGLE_API_KEY)
 
 EMBEDDING_MODEL = "models/text-embedding-004"
 

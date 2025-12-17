@@ -14,14 +14,17 @@ from qdrant_client.models import (
 import google.generativeai as genai
 from langchain_core.documents import Document
 
+from secrets_loader import get_secret
 
+QDRANT_API_KEY = get_secret("QDRANT_API_KEY")
 qdrant_client = QdrantClient(
     url="https://d14b12c7-d670-4b28-91ad-5198f84e092b.europe-west3-0.gcp.cloud.qdrant.io:6333",
-    api_key=os.getenv("QDRANT_API_KEY"),
+    api_key=QDRANT_API_KEY,
 )
 COLLECTION_NAME = "rag_documents"
 
-genai.configure(api_key=os.environ["GOOGLE_API_KEY"])
+GOOGLE_API_KEY = get_secret("GOOGLE_API_KEY")
+genai.configure(api_key=GOOGLE_API_KEY)
 
 EMBEDDING_MODEL = "models/text-embedding-004"
 

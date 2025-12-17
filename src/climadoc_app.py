@@ -6,6 +6,7 @@ from langchain_core.messages import HumanMessage, AIMessage
 from langchain_google_genai import ChatGoogleGenerativeAI
 from workflow import run_climadoc_workflow
 from rag_pipelines import document_ingestion_pipeline
+from secrets_loader import get_secret
 
 # Page configuration
 st.set_page_config(
@@ -26,8 +27,8 @@ if "llm_model" not in st.session_state:
     st.session_state.llm_model = "gemini-2.0-flash"
 
 if "api_key" not in st.session_state:
-    # Try to get API key from environment variable as default
-    st.session_state.api_key = os.getenv("GOOGLE_API_KEY", "")
+    # Try to get API key from Streamlit secrets/TOML/environment as default
+    st.session_state.api_key = get_secret("GOOGLE_API_KEY", "")
 
 if "llm_initialized" not in st.session_state:
     st.session_state.llm_initialized = False

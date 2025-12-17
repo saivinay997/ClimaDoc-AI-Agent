@@ -127,9 +127,15 @@ The app supports the following Google Gemini models:
 
 ### API Keys
 
-You can provide API keys in two ways:
-1. **Environment Variables**: Set `GOOGLE_API_KEY` in your `.env` file
-2. **UI Input**: Enter the API key directly in the Streamlit sidebar
+You can provide API keys in these ways:
+1. **Streamlit secrets (recommended for deployment)**: Create `.streamlit/secrets.toml`
+   ```toml
+   GOOGLE_API_KEY = "your_google_api_key"
+   OPENWEATHER_API_KEY = "your_openweather_api_key"
+   QDRANT_API_KEY = "your_qdrant_api_key"
+   ```
+2. **Environment variables**: Set `GOOGLE_API_KEY`, `OPENWEATHER_API_KEY`, and `QDRANT_API_KEY`
+3. **UI Input**: Enter the Google API key directly in the Streamlit sidebar
 
 ### Vector Database
 

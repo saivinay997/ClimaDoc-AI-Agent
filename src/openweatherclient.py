@@ -1,15 +1,13 @@
 import os
 import requests
 from typing import Dict, Optional
-from dotenv import load_dotenv
 from datetime import datetime, timezone
 
 from mongodb_cache import MongoCache
 from utils import info_logger, unix_to_ist, local_time_to_unix
+from secrets_loader import get_secret
 
-load_dotenv()
-
-OPENWEATHER_API_KEY = os.getenv("OPENWEATHER_API_KEY")
+OPENWEATHER_API_KEY = get_secret("OPENWEATHER_API_KEY")
 
 
 class OpenWeatherGeoClient:

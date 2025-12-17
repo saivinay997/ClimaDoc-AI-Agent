@@ -1,5 +1,4 @@
 import os
-from dotenv import load_dotenv
 import re
 import json
 
@@ -10,13 +9,12 @@ from langchain_core.messages import AIMessage, SystemMessage, HumanMessage, Tool
 from langgraph.graph import StateGraph, START, END
 from langchain_google_genai import ChatGoogleGenerativeAI
 
-
-
 import prompts
 from agent_tools import tools, format_tool_description
+from secrets_loader import get_secret
 
-load_dotenv()
-base_llm = ChatGoogleGenerativeAI(model="gemini-2.0-flash")
+GOOGLE_API_KEY = get_secret("GOOGLE_API_KEY")
+base_llm = ChatGoogleGenerativeAI(model="gemini-2.0-flash", google_api_key=GOOGLE_API_KEY)
 
 # Global variable to store the current LLM instance (for session-based configuration)
 _current_llm = base_llm

@@ -8,13 +8,14 @@ pymongo
 langchain
 langchain-core
 langchain-community
+langchain-text-splitters
 
 # Google Gemini
 langchain-google-genai
 google-generativeai
 
 # Vector stores
-# chromadb
+qdrant-client
 
 # Embeddings / Models
 sentence-transformers
@@ -32,3 +33,6 @@ tiktoken
 
 # Streamlit
 streamlit
+
+# python test
+pytz

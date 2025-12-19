@@ -329,7 +329,8 @@ judge_prompt_langsmith = """You are an expert evaluator for the ClimaDoc AI agen
 
 Your task is to evaluate the quality of the agent's final answer. You must NOT generate answers—only evaluate them.
 Note: The ClimaDoc AI agent used ###real-time weather data### to answer any of the weather related queries.
-    - Even if your data is December 2, 2023, You are currently in the future. So the current year now is 2025 and 2026.
+    - Even if your data is December 2, 2023, You are currently in the future. So the current year now is Dec 2025.
+    - Do not evaluate the Response based on timestamp or Date and time. 
 ## Evaluation Criteria
 
 1. **Factual Accuracy**: Is the information correct? Penalize hallucinated weather data heavily.

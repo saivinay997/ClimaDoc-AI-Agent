@@ -10,6 +10,7 @@ from langsmith import Client, traceable
 from langsmith.evaluation import RunEvaluator, EvaluationResult
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_core.messages import SystemMessage, HumanMessage
+from prompts import judge_prompt_langsmit, judge_prompt_langsmith
 from dotenv import load_dotenv
 load_dotenv()
 from secrets_loader import get_secret
@@ -32,44 +33,6 @@ class EvaluationOutput(BaseModel):
     is_grounded: bool = Field(description="Whether the answer is grounded in provided context")
     is_complete: bool = Field(description="Whether the answer is complete and actionable")
     feedback: str = Field(description="Concise, actionable feedback")
-
-
-JUDGE_PROMPT = """You are an expert evaluator for the ClimaDoc AI agent, which provides weather information and document-based answers.
-
-Your task is to evaluate the quality of the agent's final answer. You must NOT generate answers—only evaluate them.
-Note: The ClimaDoc AI agent used ###real-time weather data### to answer any of the weather related queries.
-    - Even if your data is December 2, 2023, You are currently in the future. So the current year now is 2025 and 2026.
-## Evaluation Criteria
-
-1. **Factual Accuracy**: Is the information correct? Penalize hallucinated weather data heavily.
-2. **Groundedness**: For document-based answers, is the response grounded in the provided context? Penalize ungrounded claims.
-3. **Completeness**: Does the answer address all parts of the user's query?
-4. **Actionability**: Is the answer useful and actionable for the user?
-
-## Scoring Guidelines
-
-- **1.0**: Perfect answer - accurate, complete, well-grounded, actionable
-- **0.8-0.9**: Good answer - minor issues that don't affect usefulness
-- **0.6-0.7**: Acceptable - some missing info or minor inaccuracies
-- **0.4-0.5**: Poor - significant issues but partially useful
-- **0.0-0.3**: Fail - hallucinations, factual errors, or completely off-topic
-
-## ClimaDoc-Specific Rules
-
-- FAIL for hallucinated weather data (made-up temperatures, conditions, etc.). Reminding you that real time Weather data is injected through context.
-- FAIL for document answers not grounded in provided context
-- ALLOW minor phrasing or formatting issues
-- FAIL only for: factual errors, missing critical information, or tool misuse
-
-## Input Format
-
-User Query: {user_query}
-
-Final Answer: {final_answer}
-
-Context (if available): {context}
-
-Evaluate the answer and provide your structured assessment."""
 
 
 def get_judge_llm():
@@ -105,7 +68,7 @@ def evaluate_answer(
     llm = get_judge_llm()
     judge_llm = llm.with_structured_output(EvaluationOutput)
     
-    prompt = JUDGE_PROMPT.format(
+    prompt = judge_prompt_langsmith.format(
         user_query=user_query,
         final_answer=final_answer,
         context=context or "No context provided"
@@ -165,26 +128,6 @@ class ClimaDocEvaluator(RunEvaluator):
             }
         )
 
-
-def run_batch_evaluation(examples: list[dict]) -> list[dict]:
-    """
-    Run evaluation on multiple examples.
-    
-    Args:
-        examples: List of dicts with 'user_query', 'final_answer', and optional 'context'
-    
-    Returns:
-        List of evaluation results
-    """
-    results = []
-    for ex in examples:
-        result = evaluate_answer(
-            user_query=ex["user_query"],
-            final_answer=ex["final_answer"],
-            context=ex.get("context")
-        )
-        results.append(result)
-    return results
 
 
 # LangSmith client for programmatic access

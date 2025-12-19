@@ -85,7 +85,7 @@ After uploading PDF documents:
 - Extract specific information
 
 **Example queries:**
-- "What are the main points in the document?"
+- "Can you provide Engine specification for Royal Enfield Classic 650 from the User manual?"
 - "Summarize the policy document"
 - "What does it say about [topic]?"
 
@@ -93,6 +93,7 @@ After uploading PDF documents:
 
 - **Chat History**: All conversations are maintained during your session
 - **Clear History**: Use the "Clear Chat History" button in the sidebar to reset
+- **Delete All Records from Qdrant**: Use the "Delete All Records from Qdrant" button in the sidebar to delete the data and embeddings on the Qdrant
 - **Session Persistence**: History is cleared when you refresh the page or start a new session
 
 
@@ -102,9 +103,6 @@ After uploading PDF documents:
 
 The app supports the following Google Gemini models:
 - `gemini-2.0-flash` (default, recommended)
-- `gemini-1.5-pro`
-- `gemini-1.5-flash`
-- `gemini-pro`
 
 ### API Keys
 
@@ -114,8 +112,11 @@ You can provide API keys in these ways:
    GOOGLE_API_KEY = "your_google_api_key"
    OPENWEATHER_API_KEY = "your_openweather_api_key"
    QDRANT_API_KEY = "your_qdrant_api_key"
+   LANGSMITH_TRACING="true"
+   LANGSMITH_ENDPOINT="https://api.smith.langchain.com"
+   LANGSMITH_API_KEY="your_langsmith_api_key"
    ```
-2. **Environment variables**: Set `GOOGLE_API_KEY`, `OPENWEATHER_API_KEY`, and `QDRANT_API_KEY`
+2. **Environment variables**: Set `GOOGLE_API_KEY`, `OPENWEATHER_API_KEY`, `LANGSMITH_API_KEY` and `QDRANT_API_KEY`
 3. **UI Input**: Enter the Google API key directly in the Streamlit sidebar
 
 ### Vector Database
@@ -135,7 +136,7 @@ The ClimaDoc agent uses a sophisticated multi-step workflow:
 2. **Planning**: Creates a step-by-step plan to answer the query
 3. **Execution**: Executes the plan using available tools
 4. **Answer Compilation**: Synthesizes tool outputs into a coherent response
-5. **Judging**: Self-evaluates the answer quality
+5. **Judging**: Self-evaluates the answer quality using LangSmith
 6. **Iteration**: Refines the answer if needed (up to 3 cycles)
 
 ### Workflow Diagram
@@ -208,20 +209,13 @@ See `requirements.txt` for the complete list. Key dependencies include:
 - Check API quota limits
 - Ensure location names are spelled correctly
 
-## 🤝 Contributing
-
-Contributions are welcome! Please feel free to submit a Pull Request.
-
-## 📄 License
-
-[Add your license information here]
-
 ## 🙏 Acknowledgments
 
 - Built with [LangChain](https://www.langchain.com/)
 - Powered by [Google Gemini](https://ai.google.dev/)
 - Weather data from [OpenWeatherMap](https://openweathermap.org/)
 - Vector storage by [Qdrant](https://qdrant.tech/)
+- Evaluation by [LangSmith](https://smith.langchain.com/)
 
 ---
 

@@ -3,7 +3,7 @@ from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_core.messages import AIMessage, SystemMessage, HumanMessage
 from typing import Optional
 
-import rag_prompts
+import prompts
 from rag_pipelines import document_retrieval_pipeline
 
 # Global model instance (lazy initialization)
@@ -83,7 +83,7 @@ def rag_answer_generator(
         }
 
     # Step 2: Build RAG prompt
-    rag_prompt = [SystemMessage(content=rag_prompts.rag_answer_prompt)]
+    rag_prompt = [SystemMessage(content=prompts.rag_answer_prompt)]
     query_with_context = [HumanMessage(content=f"Query: {query.content}\n\nContext: {context}")]
 
     # Step 3: Generate answer

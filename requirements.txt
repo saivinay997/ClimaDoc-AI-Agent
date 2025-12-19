@@ -10,6 +10,10 @@ langchain-core
 langchain-community
 langchain-text-splitters
 
+# LangSmith
+langsmith 
+openevals
+
 # Google Gemini
 langchain-google-genai
 google-generativeai

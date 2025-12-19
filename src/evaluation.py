@@ -12,6 +12,7 @@ from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_core.messages import SystemMessage, HumanMessage
 from dotenv import load_dotenv
 load_dotenv()
+from secrets_loader import get_secret
 # Environment variables required:
 # - LANGSMITH_API_KEY
 # - LANGSMITH_PROJECT
@@ -19,6 +20,8 @@ load_dotenv()
 
 # Enable LangSmith tracing
 os.environ.setdefault("LANGSMITH_TRACING", "true")
+os.environ.setdefault("LANGSMITH_ENDPOINT", get_secret("LANGSMITH_ENDPOINT"))
+os.environ.setdefault("LANGSMITH_API_KEY", get_secret("LANGSMITH_API_KEY"))
 
 
 class EvaluationOutput(BaseModel):

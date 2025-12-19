@@ -95,25 +95,6 @@ After uploading PDF documents:
 - **Clear History**: Use the "Clear Chat History" button in the sidebar to reset
 - **Session Persistence**: History is cleared when you refresh the page or start a new session
 
-## 🏗️ Project Structure
-
-```
-ClimaDoc-AI-Agent/
-├── src/
-│   ├── climadoc_app.py          # Main Streamlit application
-│   ├── workflow.py               # LangGraph agent workflow definition
-│   ├── agent_tools.py            # Agent tools (weather, RAG)
-│   ├── rag_pipelines.py          # Document ingestion and retrieval pipelines
-│   ├── rag_main.py               # RAG answer generation
-│   ├── qdrant_connector.py       # Qdrant vector database connector
-│   ├── openweatherclient.py      # OpenWeatherMap API client
-│   ├── prompts.py                # System prompts for the agent
-│   ├── utils.py                  # Utility functions
-│   └── docs/                     # Sample documents directory
-├── requirements.txt              # Python dependencies
-├── README.md                     # This file
-└── .env                          # Environment variables (create this)
-```
 
 ## 🔧 Configuration
 
@@ -156,6 +137,40 @@ The ClimaDoc agent uses a sophisticated multi-step workflow:
 4. **Answer Compilation**: Synthesizes tool outputs into a coherent response
 5. **Judging**: Self-evaluates the answer quality
 6. **Iteration**: Refines the answer if needed (up to 3 cycles)
+
+### Workflow Diagram
+
+The following diagram illustrates the complete workflow structure and decision points:
+
+```mermaid
+graph TD
+    START([Start]) --> decision_making[Decision Making<br/>Determine action type]
+    
+    decision_making -->|action != 'direct'| planning[Planning<br/>Create step-by-step plan]
+    decision_making -->|action == 'direct'| END1([End])
+    
+    planning --> agent[Agent<br/>LLM with tools]
+    
+    agent -->|has tool_calls| tools[Tools<br/>Execute tool calls]
+    agent -->|no tool_calls| judge[Judge<br/>Evaluate answer quality]
+    
+    tools --> answer_compiler[Answer Compiler<br/>Synthesize tool outputs]
+    answer_compiler --> judge
+    
+    judge -->|is_good_answer == True| END2([End])
+    judge -->|is_good_answer == False<br/>& num_cycles < 3| planning
+    judge -->|is_good_answer == False<br/>& num_cycles >= 3| termination[Termination<br/>Graceful exit]
+    
+    termination --> END3([End])
+    
+    style decision_making fill:#e1f5ff
+    style planning fill:#fff4e1
+    style agent fill:#e1ffe1
+    style tools fill:#ffe1f5
+    style answer_compiler fill:#f0e1ff
+    style judge fill:#ffe1e1
+    style termination fill:#f5f5f5
+```
 
 ### Tools Available
 

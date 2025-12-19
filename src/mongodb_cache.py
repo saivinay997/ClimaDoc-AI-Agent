@@ -2,9 +2,10 @@ from datetime import datetime, timedelta
 from pymongo import MongoClient
 from typing import Optional, Dict
 from dotenv import load_dotenv
+from secrets_loader import get_secret
 load_dotenv()
 import os
-
+os.environ.setdefault("MONGO_URI", get_secret("MONGO_URI"))
 MONGO_URI = os.getenv("MONGO_URI")
 
 class MongoCache:

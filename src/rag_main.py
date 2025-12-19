@@ -9,7 +9,7 @@ from rag_pipelines import document_retrieval_pipeline
 # Global model instance (lazy initialization)
 _model = None
 
-def _get_model(api_key: Optional[str] = None, model_name: str = "gemini-2.0-flash"):
+def get_model(api_key: Optional[str] = None, model_name: str = "gemini-2.0-flash"):
     """
     Get or create the model instance. Uses globally configured API key if not provided.
     
@@ -64,7 +64,7 @@ def rag_answer_generator(
     query = HumanMessage(content=query)
     
     # Get model instance
-    model = _get_model(api_key=api_key, model_name=model_name)
+    model = get_model(api_key=api_key, model_name=model_name)
 
     # Step 1: Retrieve documents
     context, sources, documents = document_retrieval_pipeline(

@@ -23,12 +23,12 @@ from qdrant_connector import create_collection, store_embeddings_qdrant, retriev
 EMBEDDING_MODEL = "models/text-embedding-004"
 
 # Global variable to store the API key (configured by Streamlit app)
-_google_api_key = None
+google_api_key = None
 
 def configure_genai_api_key(api_key: str):
     """Configure the Google Generative AI API key globally."""
-    global _google_api_key
-    _google_api_key = api_key
+    global google_api_key
+    google_api_key = api_key
     if api_key:
         genai.configure(api_key=api_key)
 
@@ -101,7 +101,7 @@ def langchain_document_loader(
             documents.extend(docs)
 
         except Exception as e:
-            print(f"⚠️ Failed to load {config['glob']}: {e}")
+            print(f"Failed to load {config['glob']}: {e}")
 
     return documents
 
@@ -176,7 +176,7 @@ def generate_gemini_embeddings(
         genai.configure(api_key=api_key)
     elif os.getenv("GOOGLE_API_KEY") is not None:
         genai.configure(api_key=os.getenv("GOOGLE_API_KEY"))
-    elif not _google_api_key:
+    elif not google_api_key:
         raise ValueError("Google API key must be configured. Call configure_genai_api_key() or pass api_key parameter.")
 
     embedded_chunks = []
@@ -202,7 +202,7 @@ def generate_gemini_embeddings(
 
             except Exception as e:
                 print(
-                    f"⚠️ Embedding failed "
+                    f"Embedding failed "
                     f"(source={doc.metadata.get('source')}): {e}"
                 )
 
@@ -236,16 +236,6 @@ def document_ingestion_pipeline(base_dir: str, api_key: str = None) -> dict:
             - "embeddings_generated" (int): Number of embeddings generated
             - "embeddings_stored" (int): Number of embeddings stored in Qdrant
             - "message" (str): Status message or error description
-    
-    Raises:
-        ValueError: If base_dir is empty or invalid, or if API key is not configured
-        FileNotFoundError: If the directory doesn't exist
-        Exception: For errors during embedding generation or storage
-    
-    Example:
-        >>> result = document_ingestion_pipeline("./documents", api_key="your-api-key")
-        >>> print(result["embeddings_stored"])
-        150
     """
     try:
         # Validate input
@@ -270,11 +260,11 @@ def document_ingestion_pipeline(base_dir: str, api_key: str = None) -> dict:
         
         # Step 2: Chunk documents
         documents_chunked = chunk_langchain_documents(documents)
-        print(f"✓ Created {len(documents_chunked)} chunks from {len(documents)} documents")
+        print(f"Created {len(documents_chunked)} chunks from {len(documents)} documents")
         
         # Step 3: Generate embeddings
         embeddings = generate_gemini_embeddings(documents_chunked, api_key=api_key)
-        print(f"✓ Generated {len(embeddings)} embeddings")
+        print(f"Generated {len(embeddings)} embeddings")
         
         if not embeddings:
             return {
@@ -288,11 +278,11 @@ def document_ingestion_pipeline(base_dir: str, api_key: str = None) -> dict:
         
         # Step 4: Create/update collection
         create_collection(vector_size=768)
-        print("✓ Collection ready")
+        print("Collection ready")
         
         # Step 5: Store embeddings
         store_embeddings_qdrant(embedded_chunks=embeddings)
-        print(f"✓ Stored {len(embeddings)} embeddings in Qdrant DB")
+        print(f"Stored {len(embeddings)} embeddings in Qdrant DB")
         
         return {
             "status": "success",
@@ -305,7 +295,7 @@ def document_ingestion_pipeline(base_dir: str, api_key: str = None) -> dict:
         
     except ValueError as e:
         error_msg = f"Invalid input: {str(e)}"
-        print(f"❌ {error_msg}")
+        print(f"{error_msg}")
         return {
             "status": "error",
             "documents_loaded": 0,
@@ -316,7 +306,7 @@ def document_ingestion_pipeline(base_dir: str, api_key: str = None) -> dict:
         }
     except FileNotFoundError as e:
         error_msg = f"Directory not found: {str(e)}"
-        print(f"❌ {error_msg}")
+        print(f"{error_msg}")
         return {
             "status": "error",
             "documents_loaded": 0,
@@ -327,7 +317,7 @@ def document_ingestion_pipeline(base_dir: str, api_key: str = None) -> dict:
         }
     except Exception as e:
         error_msg = f"Error during ingestion: {str(e)}"
-        print(f"❌ {error_msg}")
+        print(f"{error_msg}")
         return {
             "status": "error",
             "documents_loaded": 0,
@@ -413,11 +403,11 @@ def document_retrieval_pipeline(query: str, top_k: int = 5, api_key: str = None)
         
     except ValueError as e:
         error_msg = f"Invalid input: {str(e)}"
-        print(f"❌ {error_msg}")
+        print(f"{error_msg}")
         return "", [], []
     except Exception as e:
         error_msg = f"Error during document retrieval: {str(e)}"
-        print(f"❌ {error_msg}")
+        print(f"{error_msg}")
         return "", [], []
 
 

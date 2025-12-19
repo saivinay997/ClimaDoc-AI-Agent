@@ -10,7 +10,7 @@ from langsmith import Client, traceable
 from langsmith.evaluation import RunEvaluator, EvaluationResult
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_core.messages import SystemMessage, HumanMessage
-from prompts import judge_prompt_langsmit, judge_prompt_langsmith
+from prompts import judge_prompt_langsmith, judge_prompt_langsmith
 from dotenv import load_dotenv
 load_dotenv()
 from secrets_loader import get_secret

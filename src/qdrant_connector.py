@@ -29,12 +29,12 @@ COLLECTION_NAME = "rag_documents"
 EMBEDDING_MODEL = "models/text-embedding-004"
 
 # Global variable to store the API key (configured by Streamlit app)
-_google_api_key = None
+google_api_key = None
 
 def configure_genai_api_key(api_key: str):
     """Configure the Google Generative AI API key globally."""
-    global _google_api_key
-    _google_api_key = api_key
+    global google_api_key
+    google_api_key = api_key
     if api_key:
         genai.configure(api_key=api_key)
 
@@ -111,7 +111,7 @@ def embed_query(query: str, api_key: str = None) -> list[float]:
         genai.configure(api_key=api_key)
     elif os.getenv("GOOGLE_API_KEY") is not None:
         genai.configure(api_key=os.getenv("GOOGLE_API_KEY"))
-    elif not _google_api_key:
+    elif not google_api_key:
         raise ValueError("Google API key must be configured. Call configure_genai_api_key() or pass api_key parameter.")
 
     response = genai.embed_content(

@@ -90,10 +90,7 @@ def sidebar_configuration():
         # LLM Model Selection
         st.subheader("LLM Settings")
         llm_options = [
-            "gemini-2.0-flash",
-            "gemini-1.5-pro",
-            "gemini-1.5-flash",
-            "gemini-pro"
+            "gemini-2.0-flash"
         ]
         
         selected_model = st.selectbox(
@@ -119,6 +116,7 @@ def sidebar_configuration():
         if api_key != st.session_state.api_key:
             st.session_state.api_key = api_key
             st.session_state.llm_initialized = False
+            os.environ.setdefault("GOOGLE_API_KEY", api_key)
             # Reconfigure genai if API key is provided
             if api_key:
                 configure_rag_genai(api_key)
@@ -313,6 +311,7 @@ def main():
                         conversation_history=st.session_state.conversation_history[:-1],  # Exclude current message
                         llm_instance=llm
                     )
+                    print(result)
                     
                     # Extract the final answer from the result
                     if result and "messages" in result and len(result["messages"]) > 0:

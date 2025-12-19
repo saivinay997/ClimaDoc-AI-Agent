@@ -14,24 +14,24 @@ from agent_tools import tools, format_tool_description
 
 # Global variable to store the current LLM instance (for session-based configuration)
 # The LLM is configured and passed from the Streamlit app
-_current_llm = None
+current_llm = None
 
 def set_llm(llm_instance):
     """Set the LLM instance to be used by the workflow nodes."""
-    global _current_llm
-    _current_llm = llm_instance
+    global current_llm
+    current_llm = llm_instance
 
 def get_llm():
     """Get the current LLM instance."""
-    if _current_llm is None:
+    if current_llm is None:
         raise ValueError("LLM not initialized. Please initialize the LLM in the Streamlit app before using the workflow.")
-    return _current_llm
+    return current_llm
 
 
 class AgentState(TypedDict):
-    query: list = []
-    action: str = "direct"
-    messages: list = []
+    query: list = Field(description="User query.", default=[])
+    action: str = Field(description="weather | rag | direct", default="direct")
+    messages: list = Field(description="Responses recored by agents", default = [])
     num_planning_cycles: int = 0
     is_good_answer: bool = False
     final_answer:str = ""
@@ -219,7 +219,6 @@ def answer_compiler(state:AgentState):
         )
         
         messages_to_send = [system_prompt] + state["query"]
-        print(f"\n{messages_to_send}")
         response = llm.invoke(messages_to_send)
         print("Answer Compiler node output:", response)
         return {
@@ -343,7 +342,7 @@ def termination_node(state: AgentState):
         "is_good_answer": True  # Force termination
     }
 
-    
+######################################
 ## Define the workflow(Graph)
 
 workflow = StateGraph(AgentState)
@@ -380,6 +379,8 @@ workflow.add_conditional_edges(
     {"end": END, "planning": "planning", "termination": "termination"}
 )
 workflow.add_edge("termination", END)
+
+
 
 # compile the graph
 climadoc = workflow.compile(debug=True)

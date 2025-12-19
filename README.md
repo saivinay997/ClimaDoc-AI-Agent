@@ -11,14 +11,17 @@ ClimaDoc AI is an intelligent AI agent that combines real-time weather intellige
 - **🔐 Secure API Key Management**: Input API keys securely through the UI or environment variables
 - **📊 Vector Database Integration**: Uses Qdrant for efficient document storage and retrieval
 - **🧠 Intelligent Agent Workflow**: Multi-step planning and execution workflow with self-judging capabilities
+- **📊 Evaluation**: Evaluating each response.
+
 
 ## 🚀 Quick Start
 
 ### Prerequisites
 
-- Python 3.8 or higher
+- Python 3.12 or higher
 - Google API Key for Gemini models
 - OpenWeatherMap API Key (for weather functionality)
+- LangSmit API key
 
 ### Installation
 
@@ -39,6 +42,7 @@ ClimaDoc AI is an intelligent AI agent that combines real-time weather intellige
    ```env
    GOOGLE_API_KEY=your_google_api_key_here
    OPENWEATHER_API_KEY=your_openweather_api_key_here
+   LANGSMITH_API_KEY=your_langsmith api key
    ```
 
 ### Running the Application
@@ -50,7 +54,7 @@ ClimaDoc AI is an intelligent AI agent that combines real-time weather intellige
 
 2. **Configure the LLM in the sidebar**
    - Select your preferred Gemini model
-   - Enter your Google API key (or use the one from `.env`)
+   - Enter your Google API key 
    - Click "Initialize LLM"
 
 3. **Upload documents** (optional)

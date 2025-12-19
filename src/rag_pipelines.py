@@ -3,6 +3,8 @@ from pathlib import Path
 from typing import List, Tuple
 from uuid import uuid4
 import time
+from dotenv import load_dotenv
+load_dotenv()
 
 from pypdf import PdfReader
 from langchain_text_splitters import RecursiveCharacterTextSplitter
@@ -172,6 +174,8 @@ def generate_gemini_embeddings(
     # Configure API key if provided
     if api_key:
         genai.configure(api_key=api_key)
+    elif os.getenv("GOOGLE_API_KEY") is not None:
+        genai.configure(api_key=os.getenv("GOOGLE_API_KEY"))
     elif not _google_api_key:
         raise ValueError("Google API key must be configured. Call configure_genai_api_key() or pass api_key parameter.")
 

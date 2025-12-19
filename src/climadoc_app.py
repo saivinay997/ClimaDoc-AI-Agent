@@ -6,7 +6,7 @@ from langchain_core.messages import HumanMessage, AIMessage
 from langchain_google_genai import ChatGoogleGenerativeAI
 from workflow import run_climadoc_workflow
 from rag_pipelines import document_ingestion_pipeline, configure_genai_api_key as configure_rag_genai
-from qdrant_connector import configure_genai_api_key as configure_qdrant_genai
+from qdrant_connector import configure_genai_api_key as configure_qdrant_genai, delete_all_records_from_collection
 from secrets_loader import get_secret
 
 # Page configuration
@@ -192,6 +192,17 @@ def sidebar_configuration():
         if st.button("Clear Chat History", use_container_width=True, type="secondary"):
             clear_chat_history()
         
+        # Delete Qdrant Records Button
+        st.subheader("🗄️ Vector Database Management")
+        st.caption("Delete all documents from the vector database")
+        if st.button("Delete All Records from Qdrant", use_container_width=True, type="secondary"):
+            with st.spinner("Deleting records from Qdrant..."):
+                result = delete_all_records_from_collection()
+                if result["success"]:
+                    st.success(f"✅ {result['message']}")
+                else:
+                    st.error(f"❌ {result['message']}")
+        
         st.divider()
         
         # Information Section
@@ -202,11 +213,58 @@ def sidebar_configuration():
         )
 
 
+def format_evaluation_results(eval_results):
+    """Format evaluation results as markdown."""
+    if not eval_results or not any(eval_results.values()):
+        return None
+    
+    markdown = "\n\n---\n\n### 📊 Evaluation Results\n\n"
+    
+    # Verdict
+    if eval_results.get("verdict"):
+        verdict_emoji = "✅" if eval_results["verdict"] == "pass" else "❌"
+        markdown += f"**Verdict:** {verdict_emoji} {eval_results['verdict'].upper()}\n\n"
+    
+    # Score
+    if eval_results.get("score") is not None:
+        score = eval_results["score"]
+        score_bar = "█" * int(score * 10) + "░" * (10 - int(score * 10))
+        markdown += f"**Score:** {score:.2f}/1.0 {score_bar}\n\n"
+    
+    # Quality checks
+    quality_checks = []
+    if eval_results.get("is_hallucinated") is not None:
+        status = "✅ No" if not eval_results["is_hallucinated"] else "❌ Yes"
+        quality_checks.append(f"- **Hallucinated:** {status}")
+    
+    if eval_results.get("is_grounded") is not None:
+        status = "✅ Yes" if eval_results["is_grounded"] else "❌ No"
+        quality_checks.append(f"- **Grounded:** {status}")
+    
+    if eval_results.get("is_complete") is not None:
+        status = "✅ Yes" if eval_results["is_complete"] else "❌ No"
+        quality_checks.append(f"- **Complete:** {status}")
+    
+    if quality_checks:
+        markdown += "**Quality Checks:**\n" + "\n".join(quality_checks) + "\n\n"
+    
+    # Feedback
+    if eval_results.get("feedback"):
+        markdown += f"**Feedback:** {eval_results['feedback']}\n\n"
+    
+    return markdown
+
+
 def display_chat_messages():
     """Display chat messages in the chat interface."""
     for message in st.session_state.messages:
         with st.chat_message(message["role"]):
             st.markdown(message["content"])
+            # Display evaluation results if present
+            if "evaluation" in message:
+                eval_markdown = format_evaluation_results(message["evaluation"])
+                if eval_markdown:
+                    st.markdown(eval_markdown)
 
 
 def main():
@@ -269,8 +327,26 @@ def main():
                         # Display the response
                         st.markdown(response_text)
                         
-                        # Add assistant message to chat
-                        st.session_state.messages.append({"role": "assistant", "content": response_text})
+                        # Extract evaluation results from the workflow result
+                        evaluation_results = {
+                            "verdict": result.get("verdict"),
+                            "score": result.get("score"),
+                            "is_hallucinated": result.get("is_hallucinated"),
+                            "is_grounded": result.get("is_grounded"),
+                            "is_complete": result.get("is_complete"),
+                            "feedback": result.get("feedback"),
+                        }
+                        
+                        # Display evaluation results if available
+                        eval_markdown = format_evaluation_results(evaluation_results)
+                        if eval_markdown:
+                            st.markdown(eval_markdown)
+                        
+                        # Add assistant message to chat with evaluation results
+                        message_data = {"role": "assistant", "content": response_text}
+                        if any(evaluation_results.values()):
+                            message_data["evaluation"] = evaluation_results
+                        st.session_state.messages.append(message_data)
                         
                         # Add assistant message to conversation history
                         st.session_state.conversation_history.append(AIMessage(content=response_text))

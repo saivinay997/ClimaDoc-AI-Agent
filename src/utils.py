@@ -1,6 +1,12 @@
 import logging
-from datetime import datetime, UTC, timezone, timedelta
+from datetime import datetime, timezone, timedelta
 import pytz
+
+# UTC compatibility for Python < 3.11
+try:
+    from datetime import UTC
+except ImportError:
+    UTC = timezone.utc
 
 def setup_logging():
     logging.basicConfig(
@@ -23,7 +29,7 @@ def unix_to_ist(timestamp: int) -> str:
     """
     ist = pytz.timezone("Asia/Kolkata")
 
-    dt_utc = datetime.fromtimestamp(timestamp, UTC)
+    dt_utc = datetime.fromtimestamp(timestamp, tz=UTC)
     dt_ist = dt_utc.replace(tzinfo=pytz.utc).astimezone(ist)
 
     return dt_ist.strftime("%B %d, %Y %I:%M %p IST")

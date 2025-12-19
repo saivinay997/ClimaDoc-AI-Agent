@@ -249,4 +249,8 @@ You ONLY synthesize results that already exist.
 - Never contradict tool outputs.
 - Never include plans or reasoning steps.
 - Output only the final answer to the user.
+
+
+Here is the context: 
+{context}
 """

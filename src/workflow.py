@@ -36,7 +36,13 @@ class AgentState(TypedDict):
     is_good_answer: bool = False
     final_answer:str = ""
     tool_responses: list = []
-    
+    verdict: str = Field(description="'pass' or 'fail'")
+    score: float = Field(description="Numeric score from 0 to 1")
+    is_hallucinated: bool = Field(description="Whether the answer contains hallucinated information")
+    is_grounded: bool = Field(description="Whether the answer is grounded in provided context")
+    is_complete: bool = Field(description="Whether the answer is complete and actionable")
+    feedback: str = Field(description="Concise, actionable feedback")
+
 
 class DecisionMakingOutput(BaseModel):
     action: str
@@ -209,10 +215,10 @@ def answer_compiler(state:AgentState):
     try:
         llm = get_llm()
         system_prompt = SystemMessage(
-            content=prompts.answer_compiler_prompt
+            content=prompts.answer_compiler_prompt.format(context=state.get("tool_responses"))
         )
         
-        messages_to_send = [system_prompt] + state["query"] + state["tool_responses"]
+        messages_to_send = [system_prompt] + state["query"]
         print(f"\n{messages_to_send}")
         response = llm.invoke(messages_to_send)
         print("Answer Compiler node output:", response)
@@ -231,10 +237,9 @@ class JudgeOutput(BaseModel):
     feedback: Optional[str] = Field(default=None, description="Detailed feedback about why the answer is not good. It should be None if the answer is good.")
     
 def judge_node(state: AgentState):
-    """Node to let the LLM judge the quality of its own final answer."""
-    #print("#" * 50)
-    #print("Judge node input:", state["messages"][-1])
-    # End execution if the LLM failed to provide a good answer twice
+    """Node to let the LLM judge the quality of its own final answer using Gemini evaluator."""
+    from evaluation import evaluate_answer
+    
     num_feedback_requests = state.get("num_feedback_requests", 0)
     if num_feedback_requests >= 2:
         return {"is_good_answer": True}
@@ -243,27 +248,62 @@ def judge_node(state: AgentState):
     if not state["messages"] or not any(msg.content for msg in state["messages"] if hasattr(msg, 'content')):
         return {
             "is_good_answer": True,
-            "num_feedback_requests": num_feedback_requests + 1
+            "num_feedback_requests": num_feedback_requests + 1,
+            "verdict": "",
+            "score": 0,
+            "is_hallucinated": False,
+            "is_grounded": True,
+            "is_complete": False,
+            "feedback": "",
         }
 
     try:
-        llm = get_llm()
-        judge_llm = llm.with_structured_output(JudgeOutput)
-        system_prompt = SystemMessage(content=prompts.judge_prompt)
-        response: JudgeOutput = judge_llm.invoke([system_prompt] + state["messages"])
+        # Extract user query and final answer from messages
+        user_query = state["query"][0].content
+        final_answer = ""
+        context_parts = []
+        
+        for msg in state["tool_responses"]:
+            if hasattr(msg, 'content'):
+                if msg.type == "ai" and msg.content:
+                    final_answer = msg.content
+                elif msg.type == "tool":
+                    context_parts.append(msg.content)
+        
+        context = "\n".join(context_parts) if context_parts else None
+        
+        # Use Gemini evaluator
+        result = evaluate_answer(user_query, final_answer, context)
+        
+        is_good = result["verdict"] == "pass" and result["score"] >= 0.6
+        
         output = {
-            "is_good_answer": response.is_good_answer,
+            "is_good_answer": is_good,
             "num_feedback_requests": num_feedback_requests + 1,
+            "verdict": result.get("verdict"),
+            "score": result.get("score"),
+            "is_hallucinated": result.get("is_hallucinated"),
+            "is_grounded": result.get("is_grounded"),
+            "is_complete": result.get("is_complete"),
+            "feedback": result.get("feedback"),
         }
-        if response.feedback:
-            output["messages"] = [AIMessage(content=response.feedback)]
-            print("Judge node output:", output["messages"][-1])
+        
+        # if not is_good and result["feedback"]:
+        #     output["messages"] = [AIMessage(content=final_answer)]
+        #     print("Judge node output:", output["messages"][-1])
+        
         return output
     except Exception as e:
         print(f"Error in judge_node: {e}")
         return {
-            "is_good_answer": True,  # Assume good answer to avoid infinite loops
-            "num_feedback_requests": num_feedback_requests + 1
+            "is_good_answer": True,
+            "num_feedback_requests": num_feedback_requests + 1,
+            "verdict": "",
+            "score": 0,
+            "is_hallucinated": False,
+            "is_grounded": True,
+            "is_complete": False,
+            "feedback": "",
         }
         
 # Final answer router function
@@ -284,7 +324,7 @@ def final_answer_router(state: AgentState):
             return "termination"
         else:
             #print("Final answer router - continuing to planning")
-            return "planning"
+            return "end"
 
 
 def termination_node(state: AgentState):
@@ -327,7 +367,7 @@ workflow.add_conditional_edges(
     {"planning": "planning", "end": END}
 )
 workflow.add_edge("planning", "agent")
-workflow.add_edge("tools", "agent")
+workflow.add_edge("tools", "answer_compiler")
 workflow.add_conditional_edges(
     "agent",
     should_continue,

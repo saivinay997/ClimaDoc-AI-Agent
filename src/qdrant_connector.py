@@ -1,6 +1,8 @@
 import os
 from typing import List, Optional
 from uuid import uuid4
+from dotenv import load_dotenv
+load_dotenv()
 
 from qdrant_client import QdrantClient
 from qdrant_client.models import (
@@ -10,6 +12,7 @@ from qdrant_client.models import (
     Filter,
     FieldCondition,
     MatchValue,
+    PointIdsList,
 )
 import google.generativeai as genai
 from langchain_core.documents import Document
@@ -106,9 +109,11 @@ def embed_query(query: str, api_key: str = None) -> list[float]:
     # Configure API key if provided
     if api_key:
         genai.configure(api_key=api_key)
+    elif os.getenv("GOOGLE_API_KEY") is not None:
+        genai.configure(api_key=os.getenv("GOOGLE_API_KEY"))
     elif not _google_api_key:
         raise ValueError("Google API key must be configured. Call configure_genai_api_key() or pass api_key parameter.")
-    
+
     response = genai.embed_content(
         model=EMBEDDING_MODEL,
         content=query,
@@ -172,3 +177,80 @@ def retrieve_similar_documents(
         )
 
     return documents
+
+
+def delete_all_records_from_collection() -> dict:
+    """
+    Delete all records from the Qdrant collection.
+    
+    Returns:
+        dict: Status dictionary with 'success' (bool) and 'message' (str) keys
+    """
+    try:
+        # Check if collection exists
+        collections = qdrant_client.get_collections()
+        collection_exists = any(
+            col.name == COLLECTION_NAME for col in collections.collections
+        )
+        
+        if not collection_exists:
+            return {
+                "success": False,
+                "message": f"Collection '{COLLECTION_NAME}' does not exist.",
+                "deleted_count": 0
+            }
+        
+        # Scroll through all points to get their IDs
+        point_ids = []
+        offset = None
+        
+        while True:
+            # Scroll to get points (limit of 100 per batch)
+            result = qdrant_client.scroll(
+                collection_name=COLLECTION_NAME,
+                limit=100,
+                offset=offset,
+                with_payload=False,
+                with_vectors=False
+            )
+            
+            batch_ids = [point.id for point in result[0]]
+            if not batch_ids:
+                break
+                
+            point_ids.extend(batch_ids)
+            offset = result[1]  # Next offset
+            
+            # If no next offset, we've reached the end
+            if offset is None:
+                break
+        
+        # Delete all points if any exist
+        if point_ids:
+            # Delete in batches to avoid potential issues with large collections
+            batch_size = 100
+            for i in range(0, len(point_ids), batch_size):
+                batch = point_ids[i:i + batch_size]
+                qdrant_client.delete(
+                    collection_name=COLLECTION_NAME,
+                    points_selector=PointIdsList(points=batch),
+                    wait=True
+                )
+            return {
+                "success": True,
+                "message": f"Successfully deleted {len(point_ids)} records from collection '{COLLECTION_NAME}'.",
+                "deleted_count": len(point_ids)
+            }
+        else:
+            return {
+                "success": True,
+                "message": f"Collection '{COLLECTION_NAME}' is already empty.",
+                "deleted_count": 0
+            }
+            
+    except Exception as e:
+        return {
+            "success": False,
+            "message": f"Error deleting records: {str(e)}",
+            "deleted_count": 0
+        }
